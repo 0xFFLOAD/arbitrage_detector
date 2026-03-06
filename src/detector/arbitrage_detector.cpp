@@ -25,37 +25,32 @@ void ArbitrageDetector::onPriceUpdate(Exchange exc, Symbol sym, Price price) {
         auto other_price = storage_.getPrice(other_exc, sym);
         if (!other_price.has_value()) continue; // no data yet on that exchange
 
-        Price buy_price{0}, sell_price{0};
-        Exchange buy_exc, sell_exc;
+        // always evaluate both directions explicitly; the earlier logic chose
+        // one order based on price, but we want to see both buy/sell combinations
+        // in the logs so there is no ambiguity.
+        auto logComparison = [&](Exchange b_exc, Exchange s_exc,
+                                 Price b_price, Price s_price) {
+            double spread = ((s_price.toDouble() - b_price.toDouble()) / b_price.toDouble()) * 100.0;
+            double net_spread = spread - config::getFee(b_exc) - config::getFee(s_exc);
 
-        if (price < *other_price) {
-            buy_exc = exc;
-            sell_exc = other_exc;
-            buy_price = price;
-            sell_price = *other_price;
-        } else {
-            buy_exc = other_exc;
-            sell_exc = exc;
-            buy_price = *other_price;
-            sell_price = price;
-        }
-
-        double spread = ((sell_price.toDouble() - buy_price.toDouble()) / buy_price.toDouble()) * 100.0;
-        double net_spread = spread - config::getFee(buy_exc) - config::getFee(sell_exc);
-
-        // debug output so we can see all comparisons
-        std::cout << "COMPARE: " << to_string(sym)
-                  << " buy=" << to_string(buy_exc) << "($" << buy_price.toDouble() << ")"
-                  << " sell=" << to_string(sell_exc) << "($" << sell_price.toDouble() << ")"
-                  << " spread=" << spread << "%"
-                  << " net=" << net_spread << "%"
-                  << std::endl;
-
-        if (net_spread > config::MIN_SPREAD_THRESHOLD) {
-            std::cout << "ARBITRAGE: Buy " << to_string(sym) << " on " << to_string(buy_exc)
-                      << " ($" << buy_price.toDouble() << ") → Sell on " << to_string(sell_exc)
-                      << " ($" << sell_price.toDouble() << ") | Net spread: " << net_spread << "%"
+            std::cout << "COMPARE: " << to_string(sym)
+                      << " buy=" << to_string(b_exc) << "($" << b_price.toDouble() << ")"
+                      << " sell=" << to_string(s_exc) << "($" << s_price.toDouble() << ")"
+                      << " spread=" << spread << "%"
+                      << " net=" << net_spread << "%"
                       << std::endl;
-        }
+
+            if (net_spread > config::MIN_SPREAD_THRESHOLD) {
+                std::cout << "ARBITRAGE: Buy " << to_string(sym) << " on " << to_string(b_exc)
+                          << " ($" << b_price.toDouble() << ") → Sell on " << to_string(s_exc)
+                          << " ($" << s_price.toDouble() << ") | Net spread: " << net_spread << "%"
+                          << std::endl;
+            }
+        };
+
+        // price from current exchange vs other exchange
+        logComparison(exc, other_exc, price, *other_price);
+        // and the reverse direction as well
+        logComparison(other_exc, exc, *other_price, price);
     }
 }
