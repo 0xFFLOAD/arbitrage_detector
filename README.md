@@ -44,8 +44,10 @@ make
 
 You must specify which asset the program should monitor by passing a mode
 argument.  Supported values are `btc` and `eth`; there is **no default**.
-The code is structured so adding another symbol only requires updating the
-`Symbol` enum and the `modeToSymbol` helper in `src/main.cpp`.
+Additionally, three exchanges are queried (Binance, Coinbase, Bitstamp) and
+the program aggregates prices from all of them.  The code is structured so
+adding another symbol or exchange only requires updating the appropriate enum
+and helper/fetcher class.
 
 ```sh
 # Bitcoin mode
@@ -62,6 +64,19 @@ price updates rather than arbitrage messages.  To observe the comparison logic
 and debug the calculation, the program prints a `COMPARE:` line for each
 pair of prices; you can also lower `MIN_SPREAD_THRESHOLD` in
 `src/shared/config.h` (or set it to `0`) to force arbitrage output.
+
+The fetchers are now resilient: if the websocket connection drops or an
+exception occurs, they log an error and automatically retry after a short
+(5 s) backoff.  They continue attempting to reconnect until the main thread
+calls `stop()` (currently after 60 s).  This makes short network blips or rate
+limit disconnects invisible to the rest of the program; you only see the
+"Binance: retrying connection" or similar messages in the console.
+
+Since there are now three exchanges, the detector compares every pair of
+venues each time a new price arrives.  That means you will see `COMPARE:`
+lines for Binance–Coinbase, Binance–Bitstamp and Coinbase–Bitstamp whenever
+all three have data.  Arbitrage messages are still only printed when the net
+spread after fees exceeds the threshold.
 
 ## License
 

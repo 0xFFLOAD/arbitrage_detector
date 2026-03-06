@@ -62,3 +62,20 @@ class CoinbaseFetcher: public Fetcher {
         std::thread thread_;
         std::atomic<bool> running_;
 };
+
+class BitstampFetcher: public Fetcher {
+    public:
+        BitstampFetcher(PriceStorage& storage, Symbol symbol);
+        ~BitstampFetcher() override;
+
+        void start() override;
+        void stop() override;
+
+    private:
+        void run() override;
+
+        PriceStorage& storage_;
+        Symbol symbol_;
+        std::thread thread_;
+        std::atomic<bool> running_;
+};

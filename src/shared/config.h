@@ -10,7 +10,8 @@ namespace config {
     // Set this higher than total fees to ensure actual profit
     constexpr double MIN_SPREAD_THRESHOLD = 0.1;  // 0.1%
 
-    inline constexpr std::array<double, static_cast<size_t>(Exchange::COUNT)> exchangeFees = {0.1, 0.1};
+    // fee percentages for each exchange; keep order in sync with Exchange enum
+    inline constexpr std::array<double, static_cast<size_t>(Exchange::COUNT)> exchangeFees = {0.1, 0.1, 0.1};
 
     inline double getFee(Exchange exchange) {
         return exchangeFees[static_cast<size_t>(exchange)];

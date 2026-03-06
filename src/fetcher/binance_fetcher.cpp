@@ -27,74 +27,86 @@ void BinanceFetcher::stop() {
 }
 
 void BinanceFetcher::run() {
-    try {
-        std::cout << "Connecting to Binance..." << std::endl;
-        
-        net::io_context ioc;
-        ssl::context ctx(ssl::context::tlsv12_client);
-        
-        ctx.set_default_verify_paths();
-        
-        tcp::resolver resolver(ioc);
-        websocket::stream<ssl::stream<beast::tcp_stream>> ws(ioc, ctx);
-        
-        auto const results = resolver.resolve("stream.binance.com", "9443");
-        
-        // setp 1: connect tcp
-        beast::get_lowest_layer(ws).connect(results);
+    while (running_) {
+        try {
+            std::cout << "Connecting to Binance..." << std::endl;
+            
+            net::io_context ioc;
+            ssl::context ctx(ssl::context::tlsv12_client);
+            
+            ctx.set_default_verify_paths();
+            
+            tcp::resolver resolver(ioc);
+            websocket::stream<ssl::stream<beast::tcp_stream>> ws(ioc, ctx);
+            
+            auto const results = resolver.resolve("stream.binance.com", "9443");
+            
+            // setp 1: connect tcp
+            beast::get_lowest_layer(ws).connect(results);
 
-        if (!SSL_set_tlsext_host_name(ws.next_layer().native_handle(), "stream.binance.com")) {
-            throw beast::system_error(
-                beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category()),
-                "Failed to set SNI hostname");
-        }
-        
-        // step 2: ssl handshake 
-        ws.next_layer().handshake(ssl::stream_base::client);
-        
-        std::string host = "stream.binance.com:9443";
-        
-        // step 3: websocket handshake 
-        ws.handshake(host, to_binance_stream(symbol_));
+            if (!SSL_set_tlsext_host_name(ws.next_layer().native_handle(), "stream.binance.com")) {
+                throw beast::system_error(
+                    beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category()),
+                    "Failed to set SNI hostname");
+            }
+            
+            // step 2: ssl handshake 
+            ws.next_layer().handshake(ssl::stream_base::client);
+            
+            std::string host = "stream.binance.com:9443";
+            
+            // step 3: websocket handshake 
+            ws.handshake(host, to_binance_stream(symbol_));
 
-        beast::get_lowest_layer(ws).expires_after(std::chrono::seconds(5));
+            beast::get_lowest_layer(ws).expires_after(std::chrono::seconds(5));
 
-        std::cout << "Connected to Binance!" << std::endl;
-        
-        beast::flat_buffer buffer;
-        
-        while (running_) {
+            std::cout << "Connected to Binance!" << std::endl;
+            
+            beast::flat_buffer buffer;
+            
+            while (running_) {
+                beast::error_code ec;
+                ws.read(buffer, ec);
+
+                if (ec == beast::error::timeout) continue;
+
+                if (ec) {
+                    std::cerr << "Binance read error: " + ec.message() << std::endl;
+                    break;
+                }
+                
+                std::string message = beast::buffers_to_string(buffer.data());
+                json j = json::parse(message);
+                
+                if (j.contains("p")) {
+                    double price = std::stod(j["p"].get<std::string>());
+                    Price int_price = Price::fromDouble(price);
+                    storage_.updatePrice(Exchange::Binance, symbol_, int_price);
+                    std::cout << "Binance: " << to_string(symbol_) << " = $" << price << std::endl;
+                }
+                
+                buffer.consume(buffer.size());
+            }
+            
             beast::error_code ec;
-            ws.read(buffer, ec);
+            ws.close(websocket::close_code::normal, ec);
+            // ignore close errors
 
-            if (ec == beast::error::timeout) continue;
+            break; // normal exit
+        } catch (boost::system::system_error const& e) {
+            if (!running_) break;
+            if (e.code() != net::ssl::error::stream_truncated) {
+                std::cerr << "Binance connection error: " << e.what() << std::endl;
+            }
+        } catch (std::exception const& e) {
+            if (!running_) break;
+            std::cerr << "Binance exception: " << e.what() << std::endl;
+        }
 
-            if (ec) {
-                std::cerr << "Binance read error: " + ec.message() << std::endl;
-                break;
-            }
-            
-            std::string message = beast::buffers_to_string(buffer.data());
-            json j = json::parse(message);
-            
-            if (j.contains("p")) {
-                double price = std::stod(j["p"].get<std::string>());
-                Price int_price = Price::fromDouble(price);
-                storage_.updatePrice(Exchange::Binance, symbol_, int_price);
-                std::cout << "Binance: " << to_string(symbol_) << " = $" << price << std::endl;
-            }
-            
-            buffer.consume(buffer.size());
+        if (running_) {
+            std::cerr << "Binance: retrying connection in 5 seconds..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(5));
         }
-        
-        ws.close(websocket::close_code::normal);
-        
-    } catch (boost::system::system_error const& e) {
-        if (e.code() != net::ssl::error::stream_truncated) {
-            std::cerr << "Error: " << e.what() << std::endl;
-        }
-    } catch (std::exception const& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
     }
     
     std::cout << "Binance Fetcher stopped" << std::endl;
