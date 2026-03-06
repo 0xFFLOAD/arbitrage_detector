@@ -23,6 +23,7 @@ set(SOURCES
     src/fetcher/binance_fetcher.cpp
     src/fetcher/coinbase_fetcher.cpp
     src/detector/arbitrage_detector.cpp
+    src/orderbook/orderbook.cpp
 )
 
 # Create executable
