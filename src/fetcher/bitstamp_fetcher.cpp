@@ -78,8 +78,17 @@ void BitstampFetcher::run() {
                 std::string message = beast::buffers_to_string(buffer.data());
                 json j = json::parse(message);
 
+                // debug dump of every message so we can see what Bitstamp sends
+                std::cout << "Bitstamp msg: " << j.dump() << std::endl;
+
                 if (j.contains("data") && j["data"].contains("price")) {
-                    double price = std::stod(j["data"]["price"].get<std::string>());
+                    // price may come as string or number; handle both
+                    double price;
+                    if (j["data"]["price"].is_string())
+                        price = std::stod(j["data"]["price"].get<std::string>());
+                    else
+                        price = j["data"]["price"].get<double>();
+
                     Price int_price = Price::fromDouble(price);
                     storage_.updatePrice(Exchange::Bitstamp, symbol_, int_price);
                     std::cout << "Bitstamp: " << to_string(symbol_) << " = $" << price << std::endl;
