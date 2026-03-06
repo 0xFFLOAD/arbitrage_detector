@@ -78,6 +78,14 @@ lines for Binance–Coinbase, Binance–Bitstamp and Coinbase–Bitstamp wheneve
 all three have data.  Arbitrage messages are still only printed when the net
 spread after fees exceeds the threshold.
 
+> **Editor helpers** – a `compile_commands.json` file is generated in `build`
+and symlinked at the workspace root.  A `.vscode` folder with
+`c_cpp_properties.json` and `settings.json` is included so VS Code/clangd and
+the Microsoft C++ extension automatically pick up the include paths
+(including `/opt/homebrew/include` for Boost).  Reload the window or restart
+the language server if you see any "cannot open source file <boost/...>"
+errors; the configuration is already present.
+
 ## License
 
 MIT
