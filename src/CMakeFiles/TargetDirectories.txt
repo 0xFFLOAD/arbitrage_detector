@@ -1,0 +1,3 @@
+/Users/sam/arbitrage_detector/src/CMakeFiles/arbitrage.dir
+/Users/sam/arbitrage_detector/src/CMakeFiles/edit_cache.dir
+/Users/sam/arbitrage_detector/src/CMakeFiles/rebuild_cache.dir
