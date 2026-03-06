@@ -39,7 +39,11 @@ mkdir -p build && cd build
 cmake ..
 make
 ```
-
+> **Important:** after building, run the executable from the `build`
+directory (`./build/arbitrage` or `cd build && ./arbitrage`).  Older
+binaries may linger in the `src/` folder; if you see surprising behaviour,
+remove that stale `src/arbitrage` file so only the freshly compiled binary is
+used.
 ## Run
 
 You must specify which asset the program should monitor by passing a mode
