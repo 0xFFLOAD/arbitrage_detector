@@ -64,7 +64,7 @@ void CoinbaseFetcher::run() {
         // send subscription message (key difference between binance and coinbase)
         json subscribe_msg = {
             {"type", "subscribe"},
-            {"product_ids", {"BTC-USD"}},
+            {"product_ids", {to_coinbase_product(symbol_)}},
             {"channels", {"matches"}}
         };
         ws.write(net::buffer(subscribe_msg.dump()));
@@ -89,7 +89,7 @@ void CoinbaseFetcher::run() {
                 double price = std::stod(j["price"].get<std::string>());
                 Price int_price = Price::fromDouble(price);
                 storage_.updatePrice(Exchange::Coinbase, symbol_, int_price);
-                std::cout << "Coinbase: BTC = $" << price << std::endl;
+                std::cout << "Coinbase: " << to_string(symbol_) << " = $" << price << std::endl;
             }
             
             buffer.consume(buffer.size());

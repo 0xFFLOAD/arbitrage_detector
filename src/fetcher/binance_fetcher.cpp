@@ -55,7 +55,7 @@ void BinanceFetcher::run() {
         std::string host = "stream.binance.com:9443";
         
         // step 3: websocket handshake 
-        ws.handshake(host, "/ws/btcusdt@trade");
+        ws.handshake(host, to_binance_stream(symbol_));
 
         beast::get_lowest_layer(ws).expires_after(std::chrono::seconds(5));
 
@@ -80,8 +80,8 @@ void BinanceFetcher::run() {
             if (j.contains("p")) {
                 double price = std::stod(j["p"].get<std::string>());
                 Price int_price = Price::fromDouble(price);
-                storage_.updatePrice(Exchange::Binance, Symbol::BTCUSDT, int_price);
-                std::cout << "Binance: BTC = $" << price << std::endl;
+                storage_.updatePrice(Exchange::Binance, symbol_, int_price);
+                std::cout << "Binance: " << to_string(symbol_) << " = $" << price << std::endl;
             }
             
             buffer.consume(buffer.size());

@@ -37,10 +37,18 @@ void ArbitrageDetector::onPriceUpdate(Exchange exc, Symbol sym, Price price) {
     double spread = ((sell_price.toDouble() - buy_price.toDouble()) / buy_price.toDouble()) * 100.0;
     double net_spread = spread - config::getFee(buy_exc) - config::getFee(sell_exc);
 
+    // debug output: always print comparison so it's clear the detector is running
+    std::cout << "COMPARE: " << to_string(sym)
+              << " buy=" << to_string(buy_exc) << "($" << buy_price.toDouble() << ")"
+              << " sell=" << to_string(sell_exc) << "($" << sell_price.toDouble() << ")"
+              << " spread=" << spread << "%"
+              << " net=" << net_spread << "%"
+              << std::endl;
+
     if (net_spread > config::MIN_SPREAD_THRESHOLD) {
         std::cout << "ARBITRAGE: Buy " << to_string(sym) << " on " << to_string(buy_exc)
-        << " ($" << buy_price.toDouble() << ") → Sell on " << to_string(sell_exc)
-        << " ($" << sell_price.toDouble() << ") | Net spread: " << net_spread << "%"
-        << std::endl;
+                  << " ($" << buy_price.toDouble() << ") → Sell on " << to_string(sell_exc)
+                  << " ($" << sell_price.toDouble() << ") | Net spread: " << net_spread << "%"
+                  << std::endl;
     }
 }

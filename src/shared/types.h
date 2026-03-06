@@ -4,7 +4,11 @@
 #include <chrono>
 #include <cmath>
 
-enum class Symbol { BTCUSDT, BTCUSD, COUNT };
+enum class Symbol { BTCUSDT, ETHUSDT, COUNT };
+// NOTE: we previously had BTCUSD, but we only ever compared the same logical
+// asset across exchanges.  Each fetcher maps the enum to the appropriate
+// exchange-specific ticker (e.g. "BTC-USD" for Coinbase, "BTCUSDT" for
+// Binance).  Adding new symbols here automatically expands the storage array.
 enum class Exchange { Binance, Coinbase, COUNT };
 
 enum class Side { Bid, Ask };
@@ -82,11 +86,27 @@ struct BBO {
 inline std::string to_string(Symbol s) {
     switch (s) {
         case Symbol::BTCUSDT: return "BTCUSDT";
-        case Symbol::BTCUSD: return "BTCUSD";
+        case Symbol::ETHUSDT: return "ETHUSDT";
         default: return "UNKNOWN";
     }
 }
 
+// helpers for translating to exchange-specific tickers/paths
+inline std::string to_binance_stream(Symbol s) {
+    switch (s) {
+        case Symbol::BTCUSDT: return "/ws/btcusdt@trade";
+        case Symbol::ETHUSDT: return "/ws/ethusdt@trade";
+        default: return "/";
+    }
+}
+
+inline std::string to_coinbase_product(Symbol s) {
+    switch (s) {
+        case Symbol::BTCUSDT: return "BTC-USD";
+        case Symbol::ETHUSDT: return "ETH-USD";
+        default: return "";
+    }
+}
 inline std::string to_string(Exchange e) {
     switch (e) {
         case Exchange::Binance: return "Binance";
