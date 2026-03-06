@@ -19,7 +19,7 @@ class ArbitrageDetector {
         struct Update {
             Exchange exc;
             Symbol sym;
-            Price price;
+            Price price{0};
         };
 
         // worker thread function pulls updates from the queue and performs
