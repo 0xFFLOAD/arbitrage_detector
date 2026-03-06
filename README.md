@@ -73,10 +73,12 @@ limit disconnects invisible to the rest of the program; you only see the
 "Binance: retrying connection" or similar messages in the console.
 
 Since there are now three exchanges, the detector compares every pair of
-venues each time a new price arrives.  That means you will see `COMPARE:`
-lines for Binance–Coinbase, Binance–Bitstamp and Coinbase–Bitstamp whenever
-all three have data.  Arbitrage messages are still only printed when the net
-spread after fees exceeds the threshold.
+venues each time a new price arrives — and it does so **in both directions**.
+You will see `COMPARE:` lines showing buy/sell for Binance→Coinbase,
+Coinbase→Binance, Binance→Bitstamp, Bitstamp→Binance, Coinbase→Bitstamp
+and Bitstamp→Coinbase (each time one of the prices updates).  Arbitrage
+messages are only printed when the net spread after fees exceeds the threshold
+in that particular direction.
 
 > **Editor helpers** – a `compile_commands.json` file is generated in `build`
 and symlinked at the workspace root.  A `.vscode` folder with
