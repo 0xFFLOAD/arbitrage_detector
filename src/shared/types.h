@@ -2,13 +2,38 @@
 #include <cstdint>
 #include <string>
 #include <chrono>
+#include <cmath>
 
 enum class Symbol { BTCUSDT, BTCUSD, COUNT };
 enum class Exchange { Binance, Coinbase, COUNT };
 
+enum class Side { Bid, Ask };
+
 constexpr size_t getPriceIndex(Exchange exc, Symbol sym) {
     return static_cast<size_t>(exc) * static_cast<size_t>(Symbol::COUNT) + static_cast<size_t>(sym);
 }
+
+class Quantity {
+    int64_t value = 0;
+public:
+    static constexpr int64_t SCALE = 100000000;
+
+    Quantity() = default;
+
+    explicit Quantity(int64_t v) : value(v) {};
+
+    static Quantity fromDouble(double v) {
+        return Quantity{std::llround(v * SCALE)};
+    }
+
+    double toDouble() const {
+        return static_cast<double>(value) / SCALE;
+    }
+
+    bool operator==(const Quantity& other) const {
+        return other.value == value;
+    }
+};
 
 class Price {
     int64_t value;
@@ -23,7 +48,7 @@ class Price {
         explicit Price(int64_t v) : value(v) {};
 
         static Price fromDouble(double d) {
-            return Price { static_cast<int64_t>(d * SCALE + 0.5)};
+            return Price { std::llround(d * SCALE)};
         }
 
         double toDouble() const {
@@ -45,6 +70,13 @@ class Price {
         Price operator-(const Price& otherPrice) const {
             return Price { this->value - otherPrice.value};
         }
+};
+
+struct BBO {
+    Price bestBid;
+    Quantity bidQty;
+    Price bestAsk;
+    Quantity askQty;
 };
 
 inline std::string to_string(Symbol s) {
