@@ -169,56 +169,6 @@ void BitstampFetcher::run() {
 
     std::cout << "Bitstamp Fetcher stopped" << std::endl;
 }
-    // normal websocket path
-    while (running_) {
-        try {
-            std::cout << "Connecting to Bitstamp..." << std::endl;
-
-            net::io_context ioc;
-            ssl::context ctx(ssl::context::tlsv12_client);
-            ctx.set_default_verify_paths();
-
-            tcp::resolver resolver(ioc);
-            websocket::stream<ssl::stream<beast::tcp_stream>> ws(ioc, ctx);
-
-            auto const results = resolver.resolve("ws.bitstamp.net", "443");
-            beast::get_lowest_layer(ws).connect(results);
-
-            if (!SSL_set_tlsext_host_name(ws.next_layer().native_handle(), "ws.bitstamp.net")) {
-                throw beast::system_error(
-                    beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category()),
-                    "Failed to set SNI hostname");
-            }
-
-            ws.next_layer().handshake(ssl::stream_base::client);
-
-            std::string host = "ws.bitstamp.net";
-            ws.handshake(host, "/");
-
-            beast::get_lowest_layer(ws).expires_after(std::chrono::seconds(5));
-
-            std::cout << "Connected to Bitstamp!" << std::endl;
-
-            // subscribe to live trade channel for symbol
-            json subscribe = {
-                {"event", "bts:subscribe"},
-                {"data", {{"channel", channel}}}
-            };
-            ws.write(net::buffer(subscribe.dump()));
-
-            beast::flat_buffer buffer;
-
-            while (running_) {
-                beast::error_code ec;
-                ws.read(buffer, ec);
-
-                if (ec == beast::error::timeout) continue;
-
-                if (ec) {
-                    std::cerr << "Bitstamp read error: " + ec.message() << std::endl;
-                    break;
-                }
-
                 std::string message = beast::buffers_to_string(buffer.data());
                 json j = json::parse(message);
 
