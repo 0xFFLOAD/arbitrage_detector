@@ -77,6 +77,11 @@ void UniswapFetcher::run() {
 
             auto const results = resolver.resolve(rpcHost, rpcPort);
             beast::get_lowest_layer(stream).connect(results);
+            if (!SSL_set_tlsext_host_name(stream.native_handle(), rpcHost.c_str())) {
+                throw beast::system_error(
+                    beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category()),
+                    "Failed to set SNI hostname");
+            }
             stream.handshake(ssl::stream_base::client);
 
             // build JSON-RPC request for getReserves
