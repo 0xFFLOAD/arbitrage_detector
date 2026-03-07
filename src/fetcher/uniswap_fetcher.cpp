@@ -37,13 +37,13 @@ void UniswapFetcher::stop() {
 // helper functions for pool configuration
 std::string UniswapFetcher::getPoolAddress(Symbol sym) {
     switch (sym) {
-        case Symbol::BTCUSDT:
-            // TODO: verify this address points to WBTC/USDT; the factory call
+        case Symbol::BTCUSDC:
+            // TODO: verify this address points to WBTC/USDC; the factory call
             // below revealed that 0x0d4a11...5Ba42BbF5 actually corresponds to
-            // WBTC/WETH, so the BTCUSDT pair may still need correction.
+            // WBTC/WETH, so the BTC pair may still need correction.
             return "0x0d4a11d5eEaaC28EC3F61d100b30fB5Ba42BbF5";
-        case Symbol::ETHUSDT:
-            // WETH / USDT v2 pool (obtained via Uniswap factory getPair)
+        case Symbol::ETHUSDC:
+            // WETH / USDC v2 pool (obtained via Uniswap factory getPair)
             return "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852";
         default:
             return "";
@@ -52,8 +52,8 @@ std::string UniswapFetcher::getPoolAddress(Symbol sym) {
 
 int UniswapFetcher::getToken0Decimals(Symbol sym) {
     switch (sym) {
-        case Symbol::BTCUSDT: return 8;   // WBTC has 8 decimals
-        case Symbol::ETHUSDT: return 18;  // WETH has 18 decimals
+        case Symbol::BTCUSDC: return 8;   // WBTC has 8 decimals
+        case Symbol::ETHUSDC: return 18;  // WETH has 18 decimals
         default: return 0;
     }
 }
@@ -76,6 +76,9 @@ void UniswapFetcher::run() {
     const std::string weth = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
     const std::string wbtc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599";
     const std::string wbnb = "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c"; // Wrapped BNB on Ethereum
+    // although we're denominating in USDC everywhere, the Coingecko API
+    // still expresses targets as USDT (their ticker list doesn't include USDC
+    // for the Uniswap exchange), so we match against the USDT address.
     const std::string usdt = "0xdac17f958d2ee523a2206206994597c13d831ec7";
 
     while (running_) {
@@ -118,17 +121,17 @@ void UniswapFetcher::run() {
 
                     bool match = false;
                     double price = 0.0;
-                    if (symbol_ == Symbol::ETHUSDT) {
+                    if (symbol_ == Symbol::ETHUSDC) {
                         if ((base == weth && target == usdt) ||
                             (base == usdt && target == weth)) {
                             match = true;
                         }
-                    } else if (symbol_ == Symbol::BTCUSDT) {
+                    } else if (symbol_ == Symbol::BTCUSDC) {
                         if ((base == wbtc && target == usdt) ||
                             (base == usdt && target == wbtc)) {
                             match = true;
                         }
-                    } else if (symbol_ == Symbol::BNBUSDT) {
+                    } else if (symbol_ == Symbol::BNBUSDC) {
                         if ((base == wbnb && target == usdt) ||
                             (base == usdt && target == wbnb)) {
                             match = true;
@@ -138,12 +141,12 @@ void UniswapFetcher::run() {
                     if (match) {
                         foundTicker = true;
                         double last = t["last"].get<double>();
-                        if ((symbol_ == Symbol::ETHUSDT && base == weth) ||
-                            (symbol_ == Symbol::BTCUSDT && base == wbtc) ||
-                            (symbol_ == Symbol::BNBUSDT && base == wbnb)) {
+                        if ((symbol_ == Symbol::ETHUSDC && base == weth) ||
+                            (symbol_ == Symbol::BTCUSDC && base == wbtc) ||
+                            (symbol_ == Symbol::BNBUSDC && base == wbnb)) {
                             price = last;
                         } else {
-                            // base is USDT, invert
+                            // base is USDT (Coingecko uses USDT), invert
                             if (last != 0.0) price = 1.0 / last;
                         }
                         // fallback to converted USD if zero or weird
