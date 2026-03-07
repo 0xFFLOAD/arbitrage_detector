@@ -1,5 +1,6 @@
 #include "arbitrage_detector.h"
 #include "../shared/config.h"
+#include "../shared/logging.h"
 #include <iostream>
 
 ArbitrageDetector::ArbitrageDetector(PriceStorage& storage) : storage_(storage) {
@@ -52,8 +53,8 @@ void ArbitrageDetector::workerThread() {
 
             auto other_price = storage_.getPrice(other_exc, sym);
             if (!other_price.has_value()) {
-                std::cout << "COMPARE: " << to_string(sym)
-                          << " missing price from " << to_string(other_exc) << std::endl;
+                LOG("COMPARE: " << to_string(sym)
+                          << " missing price from " << to_string(other_exc));
                 continue;
             }
 
@@ -62,18 +63,16 @@ void ArbitrageDetector::workerThread() {
                 double spread = ((s_price.toDouble() - b_price.toDouble()) / b_price.toDouble()) * 100.0;
                 double net_spread = spread - config::getFee(b_exc) - config::getFee(s_exc);
 
-                std::cout << "COMPARE: " << to_string(sym)
+                LOG("COMPARE: " << to_string(sym)
                           << " buy=" << to_string(b_exc) << "($" << b_price.toDouble() << ")"
                           << " sell=" << to_string(s_exc) << "($" << s_price.toDouble() << ")"
                           << " spread=" << spread << "%"
-                          << " net=" << net_spread << "%"
-                          << std::endl;
+                          << " net=" << net_spread << "%");
 
                 if (net_spread > config::MIN_SPREAD_THRESHOLD) {
-                    std::cout << "ARBITRAGE: Buy " << to_string(sym) << " on " << to_string(b_exc)
+                    LOG("ARBITRAGE: Buy " << to_string(sym) << " on " << to_string(b_exc)
                               << " ($" << b_price.toDouble() << ") → Sell on " << to_string(s_exc)
-                              << " ($" << s_price.toDouble() << ") | Net spread: " << net_spread << "%"
-                              << std::endl;
+                              << " ($" << s_price.toDouble() << ") | Net spread: " << net_spread << "%");
                 }
             };
 

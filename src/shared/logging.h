@@ -9,14 +9,14 @@ inline std::mutex& getLogMutex() {
     return m;
 }
 
-#define LOG(x) \ 
-    do { \ 
-        std::lock_guard<std::mutex> lock(getLogMutex()); \ 
-        std::cout << x << std::endl; \ 
+#define LOG(x) \
+    do { \
+        std::lock_guard<std::mutex> lock(getLogMutex()); \
+        std::cout << x << std::endl; \
     } while (0)
 
-#define ERR(x) \ 
-    do { \ 
-        std::lock_guard<std::mutex> lock(getLogMutex()); \ 
-        std::cerr << x << std::endl; \ 
+#define ERR(x) \
+    do { \
+        std::lock_guard<std::mutex> lock(getLogMutex()); \
+        std::cerr << x << std::endl; \
     } while (0)
