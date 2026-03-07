@@ -71,7 +71,13 @@ void UniswapFetcher::run() {
     // providers that may throttle or block the requests.
     const std::string apiHost = "api.coingecko.com";
     const std::string apiPort = "443";
-    const std::string apiPath = "/api/v3/exchanges/uniswap_v2/tickers";
+    // default to the Ethereum Uniswap V2 endpoint; BNB uses the BSC Uniswap
+    // index which is a separate slug.  We avoid any on-chain RPC calls by
+    // relying on Coingecko's ticker cache.
+    std::string apiPath = "/api/v3/exchanges/uniswap_v2/tickers";
+    if (symbol_ == Symbol::BNBUSDC) {
+        apiPath = "/api/v3/exchanges/uniswap-bsc/tickers";
+    }
 
     // token addresses in lowercase for comparison
     const std::string weth = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
@@ -81,6 +87,7 @@ void UniswapFetcher::run() {
     // still expresses targets as USDT (their ticker list doesn't include USDC
     // for the Uniswap exchange), so we match against the USDT address.
     const std::string usdt = "0xdac17f958d2ee523a2206206994597c13d831ec7";
+    const std::string usdc_bsc = "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"; // USDC on BSC
 
     while (running_) {
         try {
@@ -133,8 +140,11 @@ void UniswapFetcher::run() {
                             match = true;
                         }
                     } else if (symbol_ == Symbol::BNBUSDC) {
-                        if ((base == wbnb && target == usdt) ||
-                            (base == usdt && target == wbnb)) {
+                        // Ethereum version still looks for USDT on the Coingecko API
+                        // because they don't list USDC there; on BSC the API returns
+                        // USDC targets so we allow both.
+                        if ((base == wbnb && (target == usdt || target == usdc_bsc)) ||
+                            ((base == usdt || base == usdc_bsc) && target == wbnb)) {
                             match = true;
                         }
                     }
@@ -147,7 +157,7 @@ void UniswapFetcher::run() {
                             (symbol_ == Symbol::BNBUSDC && base == wbnb)) {
                             price = last;
                         } else {
-                            // base is USDT (Coingecko uses USDT), invert
+                            // base is some dollar token (USDT/USDC)
                             if (last != 0.0) price = 1.0 / last;
                         }
                         // fallback to converted USD if zero or weird
