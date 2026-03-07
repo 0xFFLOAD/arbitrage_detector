@@ -60,10 +60,12 @@ void CoinbaseFetcher::run() {
             beast::get_lowest_layer(ws).expires_after(std::chrono::seconds(5));
 
             LOG("Connected to Coinbase!");
+            // use the ticker channel; "matches" appears to be silent for some
+            // products (e.g. BNB-USD) even though trades occur.
             json subscribe_msg = {
                 {"type", "subscribe"},
                 {"product_ids", {product}},
-                {"channels", {"matches"}}
+                {"channels", {"ticker"}}
             };
             ws.write(net::buffer(subscribe_msg.dump()));
 
@@ -78,10 +80,14 @@ void CoinbaseFetcher::run() {
                 }
                 std::string message = beast::buffers_to_string(buffer.data());
                 json j = json::parse(message);
-                if (j.contains("type") && j["type"] == "match" && j.contains("price")) {
+                if (j.contains("type") &&
+                    (j["type"] == "ticker" || j["type"] == "match") &&
+                    j.contains("price")) {
                     double price = std::stod(j["price"].get<std::string>());
                     storage_.updatePrice(Exchange::Coinbase, symbol_, Price::fromDouble(price));
                     LOG("Coinbase: " << to_string(symbol_) << " = $" << price);
+                } else {
+                    LOG("Coinbase raw: " << message);
                 }
                 buffer.consume(buffer.size());
             }
