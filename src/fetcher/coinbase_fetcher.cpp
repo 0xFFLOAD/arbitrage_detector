@@ -1,4 +1,5 @@
 #include "fetcher.h"
+#include "../shared/logging.h"
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -27,17 +28,17 @@ void CoinbaseFetcher::stop() {
 
 void CoinbaseFetcher::run() {
     while (running_) {
-        // try to build a websocket product; helper will swap USDT→USDC automatically
+        // try to build a websocket product; helper now always returns a USDC product
         std::string product = to_coinbase_product(symbol_);
         if (product.empty()) {
-            std::cerr << "Coinbase: no USDT/USDC market for " << to_string(symbol_)
+            std::cerr << "Coinbase: no USDC market for " << to_string(symbol_)
                       << ", sleeping before retry" << std::endl;
             std::this_thread::sleep_for(std::chrono::seconds(5));
             continue;
         }
 
         try {
-            std::cout << "Connecting to Coinbase (" << product << ")..." << std::endl;
+            LOG("Connecting to Coinbase (" << product << ")...");
             net::io_context ioc;
             ssl::context ctx(ssl::context::tlsv12_client);
             ctx.set_default_verify_paths();
@@ -58,7 +59,7 @@ void CoinbaseFetcher::run() {
             ws.handshake(host, "/");
             beast::get_lowest_layer(ws).expires_after(std::chrono::seconds(5));
 
-            std::cout << "Connected to Coinbase!" << std::endl;
+            LOG("Connected to Coinbase!");
             json subscribe_msg = {
                 {"type", "subscribe"},
                 {"product_ids", {product}},
@@ -72,7 +73,7 @@ void CoinbaseFetcher::run() {
                 ws.read(buffer, ec);
                 if (ec == beast::error::timeout) continue;
                 if (ec) {
-                    std::cerr << "Coinbase read error: " + ec.message() << std::endl;
+                    ERR("Coinbase read error: " + ec.message());
                     break;
                 }
                 std::string message = beast::buffers_to_string(buffer.data());
@@ -80,7 +81,7 @@ void CoinbaseFetcher::run() {
                 if (j.contains("type") && j["type"] == "match" && j.contains("price")) {
                     double price = std::stod(j["price"].get<std::string>());
                     storage_.updatePrice(Exchange::Coinbase, symbol_, Price::fromDouble(price));
-                    std::cout << "Coinbase: " << to_string(symbol_) << " = $" << price << std::endl;
+                    LOG("Coinbase: " << to_string(symbol_) << " = $" << price);
                 }
                 buffer.consume(buffer.size());
             }
@@ -89,13 +90,13 @@ void CoinbaseFetcher::run() {
             break;
         } catch (std::exception const& e) {
             if (!running_) break;
-            std::cerr << "Coinbase exception: " << e.what() << std::endl;
+            ERR("Coinbase exception: " << e.what());
         }
 
         if (running_) {
-            std::cerr << "Coinbase: retrying connection in 5 seconds..." << std::endl;
+            ERR("Coinbase: retrying connection in 5 seconds...");
             std::this_thread::sleep_for(std::chrono::seconds(5));
         }
     }
-    std::cout << "Coinbase Fetcher stopped" << std::endl;
+    LOG("Coinbase Fetcher stopped");
 }

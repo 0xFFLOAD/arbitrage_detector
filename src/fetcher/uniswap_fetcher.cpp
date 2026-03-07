@@ -1,4 +1,5 @@
 #include "fetcher.h"
+#include "../shared/logging.h"
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <boost/beast/http.hpp>
@@ -156,23 +157,23 @@ void UniswapFetcher::run() {
                         if (price > 0.0) {
                             Price p = Price::fromDouble(price);
                             storage_.updatePrice(Exchange::Uniswap, symbol_, p);
-                            std::cout << "Uniswap: " << to_string(symbol_) << " = $" << price << std::endl;
+                            LOG("Uniswap: " << to_string(symbol_) << " = $" << price);
                             break; // use first matching ticker
                         }
                     }
                 }
                 if (!foundTicker) {
-                    std::cout << "Uniswap: no ticker found for " << to_string(symbol_) << " this cycle" << std::endl;
+                    LOG("Uniswap: no ticker found for " << to_string(symbol_) << " this cycle");
                 }
             } else {
-                std::cout << "Uniswap: response missing tickers array" << std::endl;
+                LOG("Uniswap: response missing tickers array");
             }
 
             beast::error_code ec;
             stream.shutdown(ec);
         } catch (std::exception const &e) {
             if (!running_) break;
-            std::cerr << "Uniswap exception: " << e.what() << std::endl;
+            ERR("Uniswap exception: " << e.what());
         }
 
         if (running_) {
@@ -180,5 +181,5 @@ void UniswapFetcher::run() {
         }
     }
 
-    std::cout << "Uniswap Fetcher stopped" << std::endl;
+    LOG("Uniswap Fetcher stopped");
 }

@@ -1,5 +1,5 @@
 #include "fetcher.h"
-#include <iostream>
+#include "../shared/logging.h"
 #include <string>
 #include <nlohmann/json.hpp>
 
@@ -29,7 +29,7 @@ void BinanceFetcher::stop() {
 void BinanceFetcher::run() {
     while (running_) {
         try {
-            std::cout << "Connecting to Binance..." << std::endl;
+            LOG("Connecting to Binance...");
             
             net::io_context ioc;
             ssl::context ctx(ssl::context::tlsv12_client);
@@ -60,7 +60,7 @@ void BinanceFetcher::run() {
 
             beast::get_lowest_layer(ws).expires_after(std::chrono::seconds(5));
 
-            std::cout << "Connected to Binance!" << std::endl;
+            LOG("Connected to Binance!");
             
             beast::flat_buffer buffer;
             
@@ -71,7 +71,7 @@ void BinanceFetcher::run() {
                 if (ec == beast::error::timeout) continue;
 
                 if (ec) {
-                    std::cerr << "Binance read error: " + ec.message() << std::endl;
+                    ERR("Binance read error: " + ec.message());
                     break;
                 }
                 
@@ -82,7 +82,7 @@ void BinanceFetcher::run() {
                     double price = std::stod(j["p"].get<std::string>());
                     Price int_price = Price::fromDouble(price);
                     storage_.updatePrice(Exchange::Binance, symbol_, int_price);
-                    std::cout << "Binance: " << to_string(symbol_) << " = $" << price << std::endl;
+                    LOG("Binance: " << to_string(symbol_) << " = $" << price);
                 }
                 
                 buffer.consume(buffer.size());
@@ -96,18 +96,18 @@ void BinanceFetcher::run() {
         } catch (boost::system::system_error const& e) {
             if (!running_) break;
             if (e.code() != net::ssl::error::stream_truncated) {
-                std::cerr << "Binance connection error: " << e.what() << std::endl;
+                ERR("Binance connection error: " << e.what());
             }
         } catch (std::exception const& e) {
             if (!running_) break;
-            std::cerr << "Binance exception: " << e.what() << std::endl;
+            ERR("Binance exception: " << e.what());
         }
 
         if (running_) {
-            std::cerr << "Binance: retrying connection in 5 seconds..." << std::endl;
+            ERR("Binance: retrying connection in 5 seconds...");
             std::this_thread::sleep_for(std::chrono::seconds(5));
         }
     }
     
-    std::cout << "Binance Fetcher stopped" << std::endl;
+    LOG("Binance Fetcher stopped");
 }

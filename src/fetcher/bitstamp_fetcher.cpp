@@ -1,4 +1,5 @@
 #include "fetcher.h"
+#include "../shared/logging.h"
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <string>
@@ -29,14 +30,14 @@ void BitstampFetcher::run() {
     while (running_) {
         std::string channel = to_bitstamp_channel(symbol_);
         if (channel.empty()) {
-            std::cerr << "Bitstamp: no USDT/USDC channel for " << to_string(symbol_)
+            std::cerr << "Bitstamp: no USDC channel for " << to_string(symbol_)
                       << ", retrying in 5s" << std::endl;
             std::this_thread::sleep_for(std::chrono::seconds(5));
             continue;
         }
 
         try {
-            std::cout << "Connecting to Bitstamp (" << channel << ")..." << std::endl;
+            LOG("Connecting to Bitstamp (" << channel << ")...");
 
             net::io_context ioc;
             ssl::context ctx(ssl::context::tlsv12_client);
@@ -57,7 +58,7 @@ void BitstampFetcher::run() {
             ws.handshake(host, "/");
             beast::get_lowest_layer(ws).expires_after(std::chrono::seconds(5));
 
-            std::cout << "Connected to Bitstamp!" << std::endl;
+            LOG("Connected to Bitstamp!");
             json subscribe = {
                 {"event", "bts:subscribe"},
                 {"data", {{"channel", channel}}}
@@ -70,7 +71,7 @@ void BitstampFetcher::run() {
                 ws.read(buffer, ec);
                 if (ec == beast::error::timeout) continue;
                 if (ec) {
-                    std::cerr << "Bitstamp read error: " + ec.message() << std::endl;
+                    ERR("Bitstamp read error: " + ec.message());
                     break;
                 }
                 std::string message = beast::buffers_to_string(buffer.data());
@@ -83,7 +84,7 @@ void BitstampFetcher::run() {
                         price = j["data"]["price"].get<double>();
 
                     storage_.updatePrice(Exchange::Bitstamp, symbol_, Price::fromDouble(price));
-                    std::cout << "Bitstamp: " << to_string(symbol_) << " = $" << price << std::endl;
+                    LOG("Bitstamp: " << to_string(symbol_) << " = $" << price);
                 }
                 buffer.consume(buffer.size());
             }
@@ -92,13 +93,13 @@ void BitstampFetcher::run() {
             break;
         } catch (std::exception const& e) {
             if (!running_) break;
-            std::cerr << "Bitstamp exception: " << e.what() << std::endl;
+            ERR("Bitstamp exception: " << e.what());
         }
 
         if (running_) {
-            std::cerr << "Bitstamp: retrying connection in 5 seconds..." << std::endl;
+            ERR("Bitstamp: retrying connection in 5 seconds...");
             std::this_thread::sleep_for(std::chrono::seconds(5));
         }
     }
-    std::cout << "Bitstamp Fetcher stopped" << std::endl;
+    LOG("Bitstamp Fetcher stopped");
 }
