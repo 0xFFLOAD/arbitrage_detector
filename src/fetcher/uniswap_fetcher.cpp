@@ -75,6 +75,7 @@ void UniswapFetcher::run() {
     // token addresses in lowercase for comparison
     const std::string weth = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
     const std::string wbtc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599";
+    const std::string wbnb = "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c"; // Wrapped BNB on Ethereum
     const std::string usdt = "0xdac17f958d2ee523a2206206994597c13d831ec7";
 
     while (running_) {
@@ -124,6 +125,11 @@ void UniswapFetcher::run() {
                     } else if (symbol_ == Symbol::BTCUSDT) {
                         if ((base == wbtc && target == usdt) ||
                             (base == usdt && target == wbtc)) {
+                            match = true;
+                        }
+                    } else if (symbol_ == Symbol::BNBUSDT) {
+                        if ((base == wbnb && target == usdt) ||
+                            (base == usdt && target == wbnb)) {
                             match = true;
                         }
                     }
