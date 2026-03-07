@@ -53,13 +53,17 @@ int main(int argc, char* argv[]) {
     coinbase_fetcher.start();
     bitstamp_fetcher.start();
     uniswap_fetcher.start();
-    
-    std::this_thread::sleep_for(std::chrono::seconds(60));
-    
+
+    // Run until interrupted (Ctrl+C)
+    std::cout << "Arbitrage detector running. Press Ctrl+C to exit." << std::endl;
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+
+    // On interruption, stop fetchers (this code is unreachable, but could be improved with signal handling)
     binance_fetcher.stop();
     coinbase_fetcher.stop();
-    bitstamp_fetcher.stop();  
+    bitstamp_fetcher.stop();
     uniswap_fetcher.stop();
-    
     return 0;
 }
