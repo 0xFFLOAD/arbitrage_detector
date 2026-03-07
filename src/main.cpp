@@ -12,6 +12,7 @@
 static Symbol modeToSymbol(const std::string &mode) {
     if (mode == "btc") return Symbol::BTCUSDT;
     if (mode == "eth") return Symbol::ETHUSDT;
+    if (mode == "bnb") return Symbol::BNBUSDT;
     throw std::runtime_error("unsupported mode: " + mode);
 }
 

@@ -4,7 +4,7 @@
 #include <chrono>
 #include <cmath>
 
-enum class Symbol { BTCUSDT, ETHUSDT, COUNT };
+enum class Symbol { BTCUSDT, ETHUSDT, BNBUSDT, COUNT };
 // NOTE: we previously had BTCUSD, but we only ever compared the same logical
 // asset across exchanges.  Each fetcher maps the enum to the appropriate
 // exchange-specific ticker (e.g. "BTC-USD" for Coinbase, "BTCUSDT" for
@@ -87,6 +87,7 @@ inline std::string to_string(Symbol s) {
     switch (s) {
         case Symbol::BTCUSDT: return "BTCUSDT";
         case Symbol::ETHUSDT: return "ETHUSDT";
+        case Symbol::BNBUSDT: return "BNBUSDT";
         default: return "UNKNOWN";
     }
 }
@@ -96,6 +97,7 @@ inline std::string to_binance_stream(Symbol s) {
     switch (s) {
         case Symbol::BTCUSDT: return "/ws/btcusdt@trade";
         case Symbol::ETHUSDT: return "/ws/ethusdt@trade";
+        case Symbol::BNBUSDT: return "/ws/bnbusdt@trade";
         default: return "/";
     }
 }
@@ -104,6 +106,7 @@ inline std::string to_coinbase_product(Symbol s) {
     switch (s) {
         case Symbol::BTCUSDT: return "BTC-USD";
         case Symbol::ETHUSDT: return "ETH-USD";
+        case Symbol::BNBUSDT: return "BNB-USD"; // Coinbase lists BNB-USD
         default: return "";
     }
 }
@@ -112,6 +115,7 @@ inline std::string to_bitstamp_channel(Symbol s) {
     switch (s) {
         case Symbol::BTCUSDT: return "live_trades_btcusd";
         case Symbol::ETHUSDT: return "live_trades_ethusd";
+        case Symbol::BNBUSDT: return "live_trades_bnbusd"; // may or may not exist, harmless if empty
         default: return "";
     }
 }
