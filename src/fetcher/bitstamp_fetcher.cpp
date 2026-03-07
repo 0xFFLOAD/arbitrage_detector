@@ -26,6 +26,56 @@ void BitstampFetcher::stop() {
 }
 
 void BitstampFetcher::run() {
+    std::string channel = to_bitstamp_channel(symbol_);
+    std::string coingecko_id = to_coingecko_id(symbol_);
+
+    if (channel.empty() && !coingecko_id.empty()) {
+        // use Coingecko simple price instead of websocket
+        while (running_) {
+            try {
+                net::io_context ioc;
+                ssl::context ctx(ssl::context::tlsv12_client);
+                ctx.set_default_verify_paths();
+
+                tcp::resolver resolver(ioc);
+                ssl::stream<beast::tcp_stream> stream(ioc, ctx);
+                auto const results = resolver.resolve("api.coingecko.com", "443");
+                beast::get_lowest_layer(stream).connect(results);
+                if (!SSL_set_tlsext_host_name(stream.native_handle(), "api.coingecko.com"))
+                    throw beast::system_error(
+                        beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category()),
+                        "Failed to set SNI hostname");
+                stream.handshake(ssl::stream_base::client);
+
+                std::string path = "/api/v3/simple/price?ids=" + coingecko_id + "&vs_currencies=usd";
+                http::request<http::string_body> req{http::verb::get, path, 11};
+                req.set(http::field::host, "api.coingecko.com");
+                req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+                http::write(stream, req);
+
+                beast::flat_buffer buffer;
+                http::response<http::string_body> res;
+                http::read(stream, buffer, res);
+                json j = json::parse(res.body());
+                if (j.contains(coingecko_id) && j[coingecko_id].contains("usd")) {
+                    double price = j[coingecko_id]["usd"].get<double>();
+                    storage_.updatePrice(Exchange::Bitstamp, symbol_, Price::fromDouble(price));
+                    std::cout << "Bitstamp (fallback): " << to_string(symbol_) << " = $" << price << std::endl;
+                }
+
+                beast::error_code ec;
+                stream.shutdown(ec);
+            } catch (std::exception const& e) {
+                if (!running_) break;
+                std::cerr << "Bitstamp fallback exception: " << e.what() << std::endl;
+            }
+            if (running_) std::this_thread::sleep_for(std::chrono::seconds(5));
+        }
+        std::cout << "Bitstamp Fetcher stopped" << std::endl;
+        return;
+    }
+
+    // normal websocket path
     while (running_) {
         try {
             std::cout << "Connecting to Bitstamp..." << std::endl;
@@ -58,7 +108,7 @@ void BitstampFetcher::run() {
             // subscribe to live trade channel for symbol
             json subscribe = {
                 {"event", "bts:subscribe"},
-                {"data", {{"channel", to_bitstamp_channel(symbol_)}}}
+                {"data", {{"channel", channel}}}
             };
             ws.write(net::buffer(subscribe.dump()));
 

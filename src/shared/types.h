@@ -119,6 +119,16 @@ inline std::string to_bitstamp_channel(Symbol s) {
         default: return "";
     }
 }
+
+// map our symbols to CoinGecko identifiers for fallback pricing
+inline std::string to_coingecko_id(Symbol s) {
+    switch (s) {
+        case Symbol::BTCUSDT: return "bitcoin";
+        case Symbol::ETHUSDT: return "ethereum";
+        case Symbol::BNBUSDT: return "binancecoin";
+        default: return "";
+    }
+}
 inline std::string to_string(Exchange e) {
     switch (e) {
         case Exchange::Binance: return "Binance";
