@@ -94,34 +94,74 @@ inline std::string to_string(Symbol s) {
 
 // helpers for translating to exchange-specific tickers/paths
 inline std::string to_binance_stream(Symbol s) {
+    std::string stream;
     switch (s) {
-        case Symbol::BTCUSDT: return "/ws/btcusdt@trade";
-        case Symbol::ETHUSDT: return "/ws/ethusdt@trade";
-        case Symbol::BNBUSDT: return "/ws/bnbusdt@trade";
-        default: return "/";
+        case Symbol::BTCUSDT: stream = "/ws/btcusdt@trade"; break;
+        case Symbol::ETHUSDT: stream = "/ws/ethusdt@trade"; break;
+        case Symbol::BNBUSDT: stream = "/ws/bnbusdt@trade"; break;
+        default: stream = "/";
     }
+
+    if (stream == "/") {
+        // try USDC pair for completeness
+        std::string sym = to_string(s);
+        if (sym.size() > 4 && sym.substr(sym.size() - 4) == "USDT") {
+            std::string base = sym.substr(0, sym.size() - 4);
+            for (char &c : base) c = std::tolower(c);
+            stream = "/ws/" + base + "usdc@trade";
+        }
+    }
+
+    return stream;
 }
 
 inline std::string to_coinbase_product(Symbol s) {
+    // explicit mappings for the tokens we care about first
+    std::string product;
     switch (s) {
-        case Symbol::BTCUSDT: return "BTC-USD";
-        case Symbol::ETHUSDT: return "ETH-USD";
-        // Coinbase does not offer BNB on the public websocket feed, treat as
-        // unsupported so our fallback code takes over
-        case Symbol::BNBUSDT: return "";
-        default: return "";
+        case Symbol::BTCUSDT: product = "BTC-USD"; break;
+        case Symbol::ETHUSDT: product = "ETH-USD"; break;
+        // BNB has no native Coinbase feed; leave blank and allow the generic
+        // fallback below to try a USDC market before falling back to Coingecko.
+        case Symbol::BNBUSDT: product = ""; break;
+        default: product = "";
     }
+
+    if (product.empty()) {
+        // if we didn't find a mapping, try swapping USDT→USDC automatically
+        std::string sym = to_string(s);
+        if (sym.size() > 4 && sym.substr(sym.size() - 4) == "USDT") {
+            std::string base = sym.substr(0, sym.size() - 4);
+            product = base + "-USDC"; // may still be unsupported, caller handles errors
+        }
+    }
+
+    return product;
 }
 
 inline std::string to_bitstamp_channel(Symbol s) {
+    std::string channel;
     switch (s) {
-        case Symbol::BTCUSDT: return "live_trades_btcusd";
-        case Symbol::ETHUSDT: return "live_trades_ethusd";
-        // Bitstamp doesn't actually stream BNB; leave channel empty to trigger
-        // fallback path
-        case Symbol::BNBUSDT: return "";
-        default: return "";
+        case Symbol::BTCUSDT: channel = "live_trades_btcusd"; break;
+        case Symbol::ETHUSDT: channel = "live_trades_ethusd"; break;
+        // BNB has no native stream on Bitstamp; we'll let the generic fallback
+        // below build a USDC channel and if that also fails the fetcher will
+        // drop into the Coingecko path.
+        case Symbol::BNBUSDT: channel = ""; break;
+        default: channel = "";
     }
+
+    if (channel.empty()) {
+        // try a USDC channel by lower‑casing the base symbol
+        std::string sym = to_string(s);
+        if (sym.size() > 4 && sym.substr(sym.size() - 4) == "USDT") {
+            std::string base = sym.substr(0, sym.size() - 4);
+            for (char &c : base) c = std::tolower(c);
+            channel = "live_trades_" + base + "usdc";
+        }
+    }
+
+    return channel;
 }
 
 // map our symbols to CoinGecko identifiers for fallback pricing

@@ -30,9 +30,14 @@ void CoinbaseFetcher::run() {
     std::string product = to_coinbase_product(symbol_);
     std::string cg_id = to_coingecko_id(symbol_);
 
-    if (product.empty() && !cg_id.empty()) {
-        // no direct feed available, poll coingecko instead
-        while (running_) {
+    // if we already know there is no supported feed we start in fallback mode
+    bool ws_mode = !product.empty();
+    bool attempted_usdc = (product.find("USDC") != std::string::npos);
+
+    // main loop: either use ws_mode or poll coingecko
+    while (running_) {
+        if (!ws_mode) {
+            // fallback polling
             try {
                 net::io_context ioc;
                 ssl::context ctx(ssl::context::tlsv12_client);
@@ -71,13 +76,10 @@ void CoinbaseFetcher::run() {
                 std::cerr << "Coinbase fallback exception: " << e.what() << std::endl;
             }
             if (running_) std::this_thread::sleep_for(std::chrono::seconds(5));
+            continue;
         }
-        std::cout << "Coinbase Fetcher stopped" << std::endl;
-        return;
-    }
 
-    // otherwise use websocket feed
-    while (running_) {
+        // websocket mode
         try {
             std::cout << "Connecting to Coinbase..." << std::endl;
             
@@ -155,6 +157,14 @@ void CoinbaseFetcher::run() {
         } catch (std::exception const& e) {
             if (!running_) break;
             std::cerr << "Coinbase exception: " << e.what() << std::endl;
+            // if we were trying a USDC market and it failed immediately, give up and
+            // go to Coingecko polling instead
+            if (attempted_usdc && !cg_id.empty()) {
+                std::cerr << "Coinbase USDC websocket failed, switching to Coingecko fallback" << std::endl;
+                ws_mode = false;
+                product.clear();
+                continue;
+            }
         }
 
         if (running_) {
