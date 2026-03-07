@@ -106,7 +106,9 @@ inline std::string to_coinbase_product(Symbol s) {
     switch (s) {
         case Symbol::BTCUSDT: return "BTC-USD";
         case Symbol::ETHUSDT: return "ETH-USD";
-        case Symbol::BNBUSDT: return "BNB-USD"; // Coinbase lists BNB-USD
+        // Coinbase does not offer BNB on the public websocket feed, treat as
+        // unsupported so our fallback code takes over
+        case Symbol::BNBUSDT: return "";
         default: return "";
     }
 }
@@ -115,7 +117,9 @@ inline std::string to_bitstamp_channel(Symbol s) {
     switch (s) {
         case Symbol::BTCUSDT: return "live_trades_btcusd";
         case Symbol::ETHUSDT: return "live_trades_ethusd";
-        case Symbol::BNBUSDT: return "live_trades_bnbusd"; // may or may not exist, harmless if empty
+        // Bitstamp doesn't actually stream BNB; leave channel empty to trigger
+        // fallback path
+        case Symbol::BNBUSDT: return "";
         default: return "";
     }
 }
