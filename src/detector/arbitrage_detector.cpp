@@ -87,8 +87,15 @@ void ArbitrageDetector::workerThread() {
                 }
             };
 
-            logComparison(exc, other_exc, price, *other_price);
-            logComparison(other_exc, exc, *other_price, price);
+            // always log with the cheaper price as the buy side so the first
+            // comparison line is intuitive; previously we emitted a line
+            // anchored to whichever exchange produced the update, which meant
+            // the user saw "buy=Uniswap" when Uniswap actually had the higher price.
+            if (price.toDouble() <= other_price->toDouble()) {
+                logComparison(exc, other_exc, price, *other_price);
+            } else {
+                logComparison(other_exc, exc, *other_price, price);
+            }
         }
     }
 }
