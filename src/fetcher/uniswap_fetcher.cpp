@@ -64,11 +64,18 @@ int UniswapFetcher::getToken1Decimals(Symbol sym) {
 }
 
 void UniswapFetcher::run() {
-    // we'll query a public Ethereum JSON-RPC endpoint periodically.
-    // Cloudflare's RPC was returning internal errors for Uniswap pair contracts, so
-    // switch to the llama RPC service which is open and works without an API key.
-    const std::string rpcHost = "eth.llamarpc.com";
-    const std::string rpcPort = "443";
+    // Instead of calling an Ethereum node directly (which frequently returned
+    // "internal error" or execution reverted), we fetch prices from Coingecko's
+    // Uniswap V2 exchange tickers endpoint.  This avoids reliance on RPC
+    // providers that may throttle or block the requests.
+    const std::string apiHost = "api.coingecko.com";
+    const std::string apiPort = "443";
+    const std::string apiPath = "/api/v3/exchanges/uniswap_v2/tickers";
+
+    // token addresses in lowercase for comparison
+    const std::string weth = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
+    const std::string wbtc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599";
+    const std::string usdt = "0xdac17f958d2ee523a2206206994597c13d831ec7";
 
     while (running_) {
         try {
@@ -79,35 +86,18 @@ void UniswapFetcher::run() {
             tcp::resolver resolver(ioc);
             ssl::stream<beast::tcp_stream> stream(ioc, ctx);
 
-            auto const results = resolver.resolve(rpcHost, rpcPort);
+            auto const results = resolver.resolve(apiHost, apiPort);
             beast::get_lowest_layer(stream).connect(results);
-            if (!SSL_set_tlsext_host_name(stream.native_handle(), rpcHost.c_str())) {
+            if (!SSL_set_tlsext_host_name(stream.native_handle(), apiHost.c_str())) {
                 throw beast::system_error(
                     beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category()),
                     "Failed to set SNI hostname");
             }
             stream.handshake(ssl::stream_base::client);
 
-            // build JSON-RPC request for getReserves
-            json body = {
-                {"jsonrpc", "2.0"},
-                {"id", 1},
-                {"method", "eth_call"},
-                {"params", json::array({
-                    {
-                        {"to", getPoolAddress(symbol_)},
-                        {"data", "0x0902f1ac"} // getReserves()
-                    },
-                    "latest"
-                })}
-            };
-
-            http::request<http::string_body> req{http::verb::post, "/", 11};
-            req.set(http::field::host, rpcHost);
+            http::request<http::string_body> req{http::verb::get, apiPath, 11};
+            req.set(http::field::host, apiHost);
             req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-            req.set(http::field::content_type, "application/json");
-            req.body() = body.dump();
-            req.prepare_payload();
 
             http::write(stream, req);
 
@@ -115,47 +105,54 @@ void UniswapFetcher::run() {
             http::response<http::string_body> res;
             http::read(stream, buffer, res);
 
-            // parse response
             json resp = json::parse(res.body());
-            if (resp.contains("result")) {
-                std::string hex = resp["result"].get<std::string>();
-                if (hex.rfind("0x", 0) == 0 && hex.size() >= 2 + 64 * 2) {
-                    std::string r0hex = hex.substr(2, 64);
-                    std::string r1hex = hex.substr(2 + 64, 64);
+            if (resp.contains("tickers")) {
+                for (auto &t : resp["tickers"]) {
+                    // addresses sometimes uppercase; normalize to lowercase
+                    std::string base = t["base"].get<std::string>();
+                    std::string target = t["target"].get<std::string>();
+                    std::transform(base.begin(), base.end(), base.begin(), ::tolower);
+                    std::transform(target.begin(), target.end(), target.begin(), ::tolower);
 
-                    // convert hex strings to integers
-                    boost::multiprecision::cpp_int r0(0);
-                    boost::multiprecision::cpp_int r1(0);
-                    r0 = 0;
-                    r1 = 0;
-                    for (char c : r0hex) {
-                        r0 <<= 4;
-                        if (c >= '0' && c <= '9') r0 += c - '0';
-                        else if (c >= 'a' && c <= 'f') r0 += 10 + (c - 'a');
-                        else if (c >= 'A' && c <= 'F') r0 += 10 + (c - 'A');
-                    }
-                    for (char c : r1hex) {
-                        r1 <<= 4;
-                        if (c >= '0' && c <= '9') r1 += c - '0';
-                        else if (c >= 'a' && c <= 'f') r1 += 10 + (c - 'a');
-                        else if (c >= 'A' && c <= 'F') r1 += 10 + (c - 'A');
+                    bool match = false;
+                    double price = 0.0;
+                    if (symbol_ == Symbol::ETHUSDT) {
+                        if ((base == weth && target == usdt) ||
+                            (base == usdt && target == weth)) {
+                            match = true;
+                        }
+                    } else if (symbol_ == Symbol::BTCUSDT) {
+                        if ((base == wbtc && target == usdt) ||
+                            (base == usdt && target == wbtc)) {
+                            match = true;
+                        }
                     }
 
-                    double dec0 = getToken0Decimals(symbol_);
-                    double dec1 = getToken1Decimals(symbol_);
-                    // price of token0 in terms of token1
-                    double ratio = r1.convert_to<double>() / r0.convert_to<double>();
-                    double price = ratio * std::pow(10.0, dec0 - dec1);
-                    Price p = Price::fromDouble(price);
-                    storage_.updatePrice(Exchange::Uniswap, symbol_, p);
-                    std::cout << "Uniswap: " << to_string(symbol_) << " = $" << price << std::endl;
+                    if (match) {
+                        double last = t["last"].get<double>();
+                        if ((symbol_ == Symbol::ETHUSDT && base == weth) ||
+                            (symbol_ == Symbol::BTCUSDT && base == wbtc)) {
+                            price = last;
+                        } else {
+                            // base is USDT, invert
+                            if (last != 0.0) price = 1.0 / last;
+                        }
+                        // fallback to converted USD if zero or weird
+                        if (price == 0.0 && t["converted_last"].is_object()) {
+                            price = t["converted_last"]["usd"].get<double>();
+                        }
+                        if (price > 0.0) {
+                            Price p = Price::fromDouble(price);
+                            storage_.updatePrice(Exchange::Uniswap, symbol_, p);
+                            std::cout << "Uniswap: " << to_string(symbol_) << " = $" << price << std::endl;
+                            break; // use first matching ticker
+                        }
+                    }
                 }
             }
 
-            // close connection gracefully
             beast::error_code ec;
             stream.shutdown(ec);
-            // ignore shutdown error
         } catch (std::exception const &e) {
             if (!running_) break;
             std::cerr << "Uniswap exception: " << e.what() << std::endl;
