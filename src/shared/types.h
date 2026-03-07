@@ -4,11 +4,12 @@
 #include <chrono>
 #include <cmath>
 
-enum class Symbol { BTCUSDT, ETHUSDT, BNBUSDT, COUNT };
-// NOTE: we previously had BTCUSD, but we only ever compared the same logical
-// asset across exchanges.  Each fetcher maps the enum to the appropriate
-// exchange-specific ticker (e.g. "BTC-USD" for Coinbase, "BTCUSDT" for
-// Binance).  Adding new symbols here automatically expands the storage array.
+enum class Symbol { BTCUSDC, ETHUSDC, BNBUSDC, COUNT };
+// NOTE: the enum names historically referenced USDT because that was the
+// most common quote currency, but the detectors now always use USDC.  Each
+// fetcher maps the enum to the appropriate exchange-specific ticker (e.g.
+// "BTC-USDC" for Coinbase, "BTCUSDC" for Binance).  Adding new symbols
+// here automatically expands the storage array.
 enum class Exchange { Binance, Coinbase, Bitstamp, Uniswap, COUNT };
 
 enum class Side { Bid, Ask };
@@ -85,58 +86,34 @@ struct BBO {
 
 inline std::string to_string(Symbol s) {
     switch (s) {
-        case Symbol::BTCUSDT: return "BTCUSDT";
-        case Symbol::ETHUSDT: return "ETHUSDT";
-        case Symbol::BNBUSDT: return "BNBUSDT";
+        case Symbol::BTCUSDC: return "BTCUSDC";
+        case Symbol::ETHUSDC: return "ETHUSDC";
+        case Symbol::BNBUSDC: return "BNBUSDC";
         default: return "UNKNOWN";
     }
 }
 
 // helpers for translating to exchange-specific tickers/paths
 inline std::string to_binance_stream(Symbol s) {
-    std::string stream;
+    // always subscribe to the USDC-tagged trade stream
+    std::string base;
     switch (s) {
-        case Symbol::BTCUSDT: stream = "/ws/btcusdt@trade"; break;
-        case Symbol::ETHUSDT: stream = "/ws/ethusdt@trade"; break;
-        case Symbol::BNBUSDT: stream = "/ws/bnbusdt@trade"; break;
-        default: stream = "/";
+        case Symbol::BTCUSDC: base = "btc"; break;
+        case Symbol::ETHUSDC: base = "eth"; break;
+        case Symbol::BNBUSDC: base = "bnb"; break;
+        default: return "/";
     }
-
-    if (stream == "/") {
-        // try USDC pair for completeness
-        std::string sym = to_string(s);
-        if (sym.size() > 4 && sym.substr(sym.size() - 4) == "USDT") {
-            std::string base = sym.substr(0, sym.size() - 4);
-            for (char &c : base) c = std::tolower(c);
-            stream = "/ws/" + base + "usdc@trade";
-        }
-    }
-
-    return stream;
+    return "/ws/" + base + "usdc@trade";
 }
 
 inline std::string to_coinbase_product(Symbol s) {
-    // explicit mappings for the tokens we care about first
-    std::string product;
+    // always request a USDC-denominated product
     switch (s) {
-        case Symbol::BTCUSDT: product = "BTC-USD"; break;
-        case Symbol::ETHUSDT: product = "ETH-USD"; break;
-        // BNB has no native Coinbase feed; leave blank so the generic
-        // code below will try a USDC market instead.
-        case Symbol::BNBUSDT: product = ""; break;
-        default: product = "";
+        case Symbol::BTCUSDC: return "BTC-USDC";
+        case Symbol::ETHUSDC: return "ETH-USDC";
+        case Symbol::BNBUSDC: return "BNB-USDC"; // Coinbase supports this market if available
+        default: return "";
     }
-
-    if (product.empty()) {
-        // if we didn't find a mapping, try swapping USDT→USDC automatically
-        std::string sym = to_string(s);
-        if (sym.size() > 4 && sym.substr(sym.size() - 4) == "USDT") {
-            std::string base = sym.substr(0, sym.size() - 4);
-            product = base + "-USDC"; // may still be unsupported, caller handles errors
-        }
-    }
-
-    return product;
 }
 
 inline std::string to_bitstamp_channel(Symbol s) {
