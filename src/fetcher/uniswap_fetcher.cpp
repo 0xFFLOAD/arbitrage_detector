@@ -38,11 +38,13 @@ void UniswapFetcher::stop() {
 std::string UniswapFetcher::getPoolAddress(Symbol sym) {
     switch (sym) {
         case Symbol::BTCUSDT:
-            // WBTC / USDT v2 pool
+            // TODO: verify this address points to WBTC/USDT; the factory call
+            // below revealed that 0x0d4a11...5Ba42BbF5 actually corresponds to
+            // WBTC/WETH, so the BTCUSDT pair may still need correction.
             return "0x0d4a11d5eEaaC28EC3F61d100b30fB5Ba42BbF5";
         case Symbol::ETHUSDT:
-            // WETH / USDT v2 pool
-            return "0x8ad599c3a0ff1de082011efddc58f1908eb6e6d8";
+            // WETH / USDT v2 pool (obtained via Uniswap factory getPair)
+            return "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852";
         default:
             return "";
     }
@@ -62,8 +64,10 @@ int UniswapFetcher::getToken1Decimals(Symbol sym) {
 }
 
 void UniswapFetcher::run() {
-    // we'll query a public Ethereum JSON-RPC endpoint (Cloudflare) periodically
-    const std::string rpcHost = "cloudflare-eth.com";
+    // we'll query a public Ethereum JSON-RPC endpoint periodically.
+    // Cloudflare's RPC was returning internal errors for Uniswap pair contracts, so
+    // switch to the llama RPC service which is open and works without an API key.
+    const std::string rpcHost = "eth.llamarpc.com";
     const std::string rpcPort = "443";
 
     while (running_) {
