@@ -31,7 +31,7 @@ void CoinbaseFetcher::run() {
         // try to build a websocket product; helper now always returns a USDC product
         std::string product = to_coinbase_product(symbol_);
         if (product.empty()) {
-            std::cerr << "Coinbase: no USDC market for " << to_string(symbol_)
+            std::cerr << "Coinbase: no USD market for " << to_string(symbol_)
                       << ", sleeping before retry" << std::endl;
             std::this_thread::sleep_for(std::chrono::seconds(5));
             continue;

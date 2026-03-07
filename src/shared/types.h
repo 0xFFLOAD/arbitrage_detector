@@ -107,11 +107,12 @@ inline std::string to_binance_stream(Symbol s) {
 }
 
 inline std::string to_coinbase_product(Symbol s) {
-    // always request a USDC-denominated product
+    // Coinbase provides USD pairs rather than USDC; treat USD as equivalent for
+    // our purposes since we don't rely on the quote currency being on-chain.
     switch (s) {
-        case Symbol::BTCUSDC: return "BTC-USDC";
-        case Symbol::ETHUSDC: return "ETH-USDC";
-        case Symbol::BNBUSDC: return "BNB-USDC"; // Coinbase supports this market if available
+        case Symbol::BTCUSDC: return "BTC-USD";
+        case Symbol::ETHUSDC: return "ETH-USD";
+        case Symbol::BNBUSDC: return "BNB-USD";
         default: return "";
     }
 }
