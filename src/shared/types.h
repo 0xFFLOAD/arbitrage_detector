@@ -117,27 +117,15 @@ inline std::string to_coinbase_product(Symbol s) {
 }
 
 inline std::string to_bitstamp_channel(Symbol s) {
-    std::string channel;
+    // always use USDC channel names
+    std::string base;
     switch (s) {
-        case Symbol::BTCUSDT: channel = "live_trades_btcusd"; break;
-        case Symbol::ETHUSDT: channel = "live_trades_ethusd"; break;
-        // BNB has no native stream on Bitstamp; leave blank so the generic
-        // code below will build a USDC channel instead.
-        case Symbol::BNBUSDT: channel = ""; break;
-        default: channel = "";
+        case Symbol::BTCUSDC: base = "btc"; break;
+        case Symbol::ETHUSDC: base = "eth"; break;
+        case Symbol::BNBUSDC: base = "bnb"; break;
+        default: return "";
     }
-
-    if (channel.empty()) {
-        // try a USDC channel by lower‑casing the base symbol
-        std::string sym = to_string(s);
-        if (sym.size() > 4 && sym.substr(sym.size() - 4) == "USDT") {
-            std::string base = sym.substr(0, sym.size() - 4);
-            for (char &c : base) c = std::tolower(c);
-            channel = "live_trades_" + base + "usdc";
-        }
-    }
-
-    return channel;
+    return "live_trades_" + base + "usdc";
 }
 
 inline std::string to_string(Exchange e) {

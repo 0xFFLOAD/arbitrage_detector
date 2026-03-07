@@ -10,9 +10,9 @@
 // convert a simple command-line mode into a Symbol; extend as new assets are
 // supported
 static Symbol modeToSymbol(const std::string &mode) {
-    if (mode == "btc") return Symbol::BTCUSDT;
-    if (mode == "eth") return Symbol::ETHUSDT;
-    if (mode == "bnb") return Symbol::BNBUSDT;
+    if (mode == "btc") return Symbol::BTCUSDC;
+    if (mode == "eth") return Symbol::ETHUSDC;
+    if (mode == "bnb") return Symbol::BNBUSDC;
     throw std::runtime_error("unsupported mode: " + mode);
 }
 
