@@ -224,9 +224,13 @@ double UniswapFetcher::querySubgraph(Symbol sym) {
     // build the JSON string in several steps to make the escaping
     // straightforward.  we start with a std::string so that subsequent
     // concatenations don't try to do pointer arithmetic on raw literals.
-    std::string body = "{\"query\":\"{ pair(id:\\"";
+    // build the payload in pieces so that we never end a literal on the
+    // problematic sequence `\"` (escaped quote) which would escape the
+    // closing delimiter itself.
+    std::string body = "{\"query\":\"{ pair(id:"";   // note: ends before the backslash
+    body += "\\\"";                                   // append \" (backslash+quote)
     body += pool;
-    body += "\\") { reserve0 reserve1 token0 { symbol } token1 { symbol } } }\" }";
+    body += "\\\") { reserve0 reserve1 token0 { symbol } token1 { symbol } } }\" }";
 
     try {
         net::io_context ioc2;
