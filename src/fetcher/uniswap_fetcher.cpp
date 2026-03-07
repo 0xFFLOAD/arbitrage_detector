@@ -108,6 +108,7 @@ void UniswapFetcher::run() {
 
             json resp = json::parse(res.body());
             if (resp.contains("tickers")) {
+                bool foundTicker = false;
                 for (auto &t : resp["tickers"]) {
                     // addresses sometimes uppercase; normalize to lowercase
                     std::string base = t["base"].get<std::string>();
@@ -135,9 +136,11 @@ void UniswapFetcher::run() {
                     }
 
                     if (match) {
+                        foundTicker = true;
                         double last = t["last"].get<double>();
                         if ((symbol_ == Symbol::ETHUSDT && base == weth) ||
-                            (symbol_ == Symbol::BTCUSDT && base == wbtc)) {
+                            (symbol_ == Symbol::BTCUSDT && base == wbtc) ||
+                            (symbol_ == Symbol::BNBUSDT && base == wbnb)) {
                             price = last;
                         } else {
                             // base is USDT, invert
@@ -155,6 +158,11 @@ void UniswapFetcher::run() {
                         }
                     }
                 }
+                if (!foundTicker) {
+                    std::cout << "Uniswap: no ticker found for " << to_string(symbol_) << " this cycle" << std::endl;
+                }
+            } else {
+                std::cout << "Uniswap: response missing tickers array" << std::endl;
             }
 
             beast::error_code ec;
