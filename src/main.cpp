@@ -46,16 +46,19 @@ int main(int argc, char* argv[]) {
     BinanceFetcher binance_fetcher(storage, symbol);
     CoinbaseFetcher coinbase_fetcher(storage, symbol);
     BitstampFetcher bitstamp_fetcher(storage, symbol);
+    UniswapFetcher uniswap_fetcher(storage, symbol);
     
     binance_fetcher.start();
     coinbase_fetcher.start();
     bitstamp_fetcher.start();
+    uniswap_fetcher.start();
     
     std::this_thread::sleep_for(std::chrono::seconds(60));
     
     binance_fetcher.stop();
     coinbase_fetcher.stop();
     bitstamp_fetcher.stop();  
+    uniswap_fetcher.stop();
     
     return 0;
 }

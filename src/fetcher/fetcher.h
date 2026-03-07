@@ -79,3 +79,24 @@ class BitstampFetcher: public Fetcher {
         std::thread thread_;
         std::atomic<bool> running_;
 };
+
+// simple HTTP-based fetcher that polls a Uniswap pool contract on Ethereum
+class UniswapFetcher: public Fetcher {
+    public:
+        UniswapFetcher(PriceStorage& storage, Symbol symbol);
+        ~UniswapFetcher() override;
+
+        void start() override;
+        void stop() override;
+
+    private:
+        void run() override;
+        static std::string getPoolAddress(Symbol sym);
+        static int getToken0Decimals(Symbol sym);
+        static int getToken1Decimals(Symbol sym);
+
+        PriceStorage& storage_;
+        Symbol symbol_;
+        std::thread thread_;
+        std::atomic<bool> running_;
+};

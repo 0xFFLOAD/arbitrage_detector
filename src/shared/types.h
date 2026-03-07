@@ -9,7 +9,7 @@ enum class Symbol { BTCUSDT, ETHUSDT, COUNT };
 // asset across exchanges.  Each fetcher maps the enum to the appropriate
 // exchange-specific ticker (e.g. "BTC-USD" for Coinbase, "BTCUSDT" for
 // Binance).  Adding new symbols here automatically expands the storage array.
-enum class Exchange { Binance, Coinbase, Bitstamp, COUNT };
+enum class Exchange { Binance, Coinbase, Bitstamp, Uniswap, COUNT };
 
 enum class Side { Bid, Ask };
 
@@ -120,6 +120,7 @@ inline std::string to_string(Exchange e) {
         case Exchange::Binance: return "Binance";
         case Exchange::Coinbase: return "Coinbase";
         case Exchange::Bitstamp: return "Bitstamp";
+        case Exchange::Uniswap: return "Uniswap";
         default: return "UNKNOWN";
     }
 }
