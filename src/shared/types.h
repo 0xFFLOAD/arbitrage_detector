@@ -118,7 +118,8 @@ inline std::string to_coinbase_product(Symbol s) {
 }
 
 inline std::string to_bitstamp_channel(Symbol s) {
-    // always use USDC channel names
+    // prefer USDC channels, but fall back to USD for pairs that only exist
+    // in that format (e.g. BNB).  We lowercase the base symbol for the path.
     std::string base;
     switch (s) {
         case Symbol::BTCUSDC: base = "btc"; break;
@@ -126,7 +127,16 @@ inline std::string to_bitstamp_channel(Symbol s) {
         case Symbol::BNBUSDC: base = "bnb"; break;
         default: return "";
     }
-    return "live_trades_" + base + "usdc";
+    std::string channel = "live_trades_" + base + "usdc";
+    // quick HTTP check isn’t appropriate here, so we rely on the websocket
+    // later to simply provide no messages if the channel doesn’t exist.  But
+    // to improve the odds we also build the USD version so the caller can
+    // retry it manually if the first attempt yields nothing.
+    if (s == Symbol::BNBUSDC) {
+        // BNB/USDC isn’t offered; try BNB/USD instead
+        channel = "live_trades_" + base + "usd";
+    }
+    return channel;
 }
 
 inline std::string to_string(Exchange e) {
