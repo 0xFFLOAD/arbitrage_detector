@@ -227,8 +227,8 @@ double UniswapFetcher::querySubgraph(Symbol sym) {
     // build the payload in pieces so that we never end a literal on the
     // problematic sequence `\"` (escaped quote) which would escape the
     // closing delimiter itself.
-    std::string body = "{\"query\":\"{ pair(id:"";   // note: ends before the backslash
-    body += "\\\"";                                   // append \" (backslash+quote)
+    std::string body = "{\"query\":\"{ pair(id:";   // start, no backslash or quote
+    body += "\\\"";                                      // put the escaped-quote sequence \" now
     body += pool;
     body += "\\\") { reserve0 reserve1 token0 { symbol } token1 { symbol } } }\" }";
 

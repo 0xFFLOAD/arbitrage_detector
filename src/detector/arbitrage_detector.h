@@ -32,5 +32,10 @@ class ArbitrageDetector {
         std::mutex mutex_;
         std::condition_variable cv_;
         bool stop_ = false;
+
+        // remember which exchange/symbol pairs have ever produced a price;
+        // used to suppress "missing price" logs during startup.
+        std::array<std::array<bool, static_cast<size_t>(Exchange::COUNT)>,
+                   static_cast<size_t>(Symbol::COUNT)> seen_;
 };
 
