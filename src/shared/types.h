@@ -121,8 +121,8 @@ inline std::string to_coinbase_product(Symbol s) {
     switch (s) {
         case Symbol::BTCUSDT: product = "BTC-USD"; break;
         case Symbol::ETHUSDT: product = "ETH-USD"; break;
-        // BNB has no native Coinbase feed; leave blank and allow the generic
-        // fallback below to try a USDC market before falling back to Coingecko.
+        // BNB has no native Coinbase feed; leave blank so the generic
+        // code below will try a USDC market instead.
         case Symbol::BNBUSDT: product = ""; break;
         default: product = "";
     }
@@ -144,9 +144,8 @@ inline std::string to_bitstamp_channel(Symbol s) {
     switch (s) {
         case Symbol::BTCUSDT: channel = "live_trades_btcusd"; break;
         case Symbol::ETHUSDT: channel = "live_trades_ethusd"; break;
-        // BNB has no native stream on Bitstamp; we'll let the generic fallback
-        // below build a USDC channel and if that also fails the fetcher will
-        // drop into the Coingecko path.
+        // BNB has no native stream on Bitstamp; leave blank so the generic
+        // code below will build a USDC channel instead.
         case Symbol::BNBUSDT: channel = ""; break;
         default: channel = "";
     }
@@ -164,15 +163,6 @@ inline std::string to_bitstamp_channel(Symbol s) {
     return channel;
 }
 
-// map our symbols to CoinGecko identifiers for fallback pricing
-inline std::string to_coingecko_id(Symbol s) {
-    switch (s) {
-        case Symbol::BTCUSDT: return "bitcoin";
-        case Symbol::ETHUSDT: return "ethereum";
-        case Symbol::BNBUSDT: return "binancecoin";
-        default: return "";
-    }
-}
 inline std::string to_string(Exchange e) {
     switch (e) {
         case Exchange::Binance: return "Binance";
