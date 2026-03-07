@@ -51,7 +51,11 @@ void ArbitrageDetector::workerThread() {
             if (other_exc == exc) continue;
 
             auto other_price = storage_.getPrice(other_exc, sym);
-            if (!other_price.has_value()) continue;
+            if (!other_price.has_value()) {
+                std::cout << "COMPARE: " << to_string(sym)
+                          << " missing price from " << to_string(other_exc) << std::endl;
+                continue;
+            }
 
             auto logComparison = [&](Exchange b_exc, Exchange s_exc,
                                      Price b_price, Price s_price) {
