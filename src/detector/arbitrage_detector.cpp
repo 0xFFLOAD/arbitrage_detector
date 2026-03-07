@@ -9,7 +9,12 @@ ArbitrageDetector::ArbitrageDetector(PriceStorage& storage) : storage_(storage) 
     for (unsigned int i = 0; i < n; ++i) {
         workers_.emplace_back(&ArbitrageDetector::workerThread, this);
     }
+    // track which exchange/symbol combinations have ever produced a price so we
+    // don't spam the log with "missing" messages at startup when some feeds
+    // are still warming up.
+    seen_.fill({});
 }
+
 
 ArbitrageDetector::~ArbitrageDetector() {
     {
@@ -23,6 +28,8 @@ ArbitrageDetector::~ArbitrageDetector() {
 }
 
 void ArbitrageDetector::onPriceUpdate(Exchange exc, Symbol sym, Price price) {
+    // mark that this feed has seen at least one price for the symbol
+    seen_[static_cast<size_t>(sym)][static_cast<size_t>(exc)] = true;
     // enqueue the update and wake a worker
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -53,8 +60,12 @@ void ArbitrageDetector::workerThread() {
 
             auto other_price = storage_.getPrice(other_exc, sym);
             if (!other_price.has_value()) {
-                LOG("COMPARE: " << to_string(sym)
-                          << " missing price from " << to_string(other_exc));
+                // only complain if we've actually seen the exchange before;
+                // avoids startup spam while the websocket/REST handlers warm up
+                if (seen_[static_cast<size_t>(sym)][static_cast<size_t>(other_exc)]) {
+                    LOG("COMPARE: " << to_string(sym)
+                              << " missing price from " << to_string(other_exc));
+                }
                 continue;
             }
 

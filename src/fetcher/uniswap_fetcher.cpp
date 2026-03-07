@@ -1,6 +1,7 @@
 #include "fetcher.h"
 #include "../shared/logging.h"
 #include <iostream>
+#include <sstream>
 #include <nlohmann/json.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/version.hpp>
@@ -46,6 +47,11 @@ std::string UniswapFetcher::getPoolAddress(Symbol sym) {
         case Symbol::ETHUSDC:
             // WETH / USDC v2 pool (obtained via Uniswap factory getPair)
             return "0x0d4a11d5eeaac28ec3f61d100daf4d40471f1852";
+        case Symbol::BNBUSDC:
+            // PancakeSwap WBNB/USDC pair (from the BSC subgraph query);
+            // not actually on Uniswap but we reuse the same fetcher logic
+            // when falling back to the graph endpoint.
+            return "0x16a2fa1fa4a802a3bce8900ac766a1fa295c0d57";
         default:
             return "";
     }
@@ -89,6 +95,10 @@ void UniswapFetcher::run() {
     const std::string usdt = "0xdac17f958d2ee523a2206206994597c13d831ec7";
     const std::string usdc_bsc = "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d"; // USDC on BSC
 
+    // helper that will query The Graph when Coingecko fails.  implemented
+    // as a member function so the run() body remains clean and easier to
+    // reason about.
+    
     while (running_) {
         try {
             net::io_context ioc;
@@ -118,10 +128,10 @@ void UniswapFetcher::run() {
             http::read(stream, buffer, res);
 
             json resp = json::parse(res.body());
+            bool priceUpdated = false;
             if (resp.contains("tickers")) {
                 bool foundTicker = false;
                 for (auto &t : resp["tickers"]) {
-                    // addresses sometimes uppercase; normalize to lowercase
                     std::string base = t["base"].get<std::string>();
                     std::string target = t["target"].get<std::string>();
                     std::transform(base.begin(), base.end(), base.begin(), ::tolower);
@@ -140,9 +150,6 @@ void UniswapFetcher::run() {
                             match = true;
                         }
                     } else if (symbol_ == Symbol::BNBUSDC) {
-                        // Ethereum version still looks for USDT on the Coingecko API
-                        // because they don't list USDC there; on BSC the API returns
-                        // USDC targets so we allow both.
                         if ((base == wbnb && (target == usdt || target == usdc_bsc)) ||
                             ((base == usdt || base == usdc_bsc) && target == wbnb)) {
                             match = true;
@@ -157,26 +164,29 @@ void UniswapFetcher::run() {
                             (symbol_ == Symbol::BNBUSDC && base == wbnb)) {
                             price = last;
                         } else {
-                            // base is some dollar token (USDT/USDC)
                             if (last != 0.0) price = 1.0 / last;
                         }
-                        // fallback to converted USD if zero or weird
                         if (price == 0.0 && t["converted_last"].is_object()) {
                             price = t["converted_last"]["usd"].get<double>();
                         }
                         if (price > 0.0) {
-                            Price p = Price::fromDouble(price);
-                            storage_.updatePrice(Exchange::Uniswap, symbol_, p);
+                            storage_.updatePrice(Exchange::Uniswap, symbol_, Price::fromDouble(price));
                             LOG("Uniswap: " << to_string(symbol_) << " = $" << price);
-                            break; // use first matching ticker
+                            priceUpdated = true;
+                            break;
                         }
                     }
                 }
                 if (!foundTicker) {
                     LOG("Uniswap: no ticker found for " << to_string(symbol_) << " this cycle");
                 }
-            } else {
-                LOG("Uniswap: response missing tickers array");
+            }
+            if (!priceUpdated) {
+                double p = querySubgraph(symbol_);
+                if (p > 0.0) {
+                    storage_.updatePrice(Exchange::Uniswap, symbol_, Price::fromDouble(p));
+                    LOG("Uniswap (graph): " << to_string(symbol_) << " = $" << p);
+                }
             }
 
             beast::error_code ec;
@@ -192,4 +202,75 @@ void UniswapFetcher::run() {
     }
 
     LOG("Uniswap Fetcher stopped");
+}
+
+// private helper that queries The Graph subgraph for the given pair.  The
+// implementation used to be a lambda inside run(), but moving it here simplifies
+// the control flow and keeps run() tidy.
+double UniswapFetcher::querySubgraph(Symbol sym) {
+    std::string host = "api.thegraph.com";
+    std::string path;
+    std::string pool = getPoolAddress(sym);
+    if (sym == Symbol::BNBUSDC) {
+        path = "/subgraphs/name/pancakeswap/exchange-v2";
+        if (pool.empty()) {
+            pool = "0x16a2fa1fa4a802a3bce8900ac766a1fa295c0d57";
+        }
+    } else {
+        path = "/subgraphs/name/uniswap/uniswap-v2";
+    }
+    if (pool.empty()) return 0.0;
+
+    // build the JSON string in several steps to make the escaping
+    // straightforward.  we start with a std::string so that subsequent
+    // concatenations don't try to do pointer arithmetic on raw literals.
+    std::string body = "{\"query\":\"{ pair(id:\\"";
+    body += pool;
+    body += "\\") { reserve0 reserve1 token0 { symbol } token1 { symbol } } }\" }";
+
+    try {
+        net::io_context ioc2;
+        ssl::context ctx2(ssl::context::tlsv12_client);
+        ctx2.set_default_verify_paths();
+        tcp::resolver resolver2(ioc2);
+        ssl::stream<beast::tcp_stream> stream2(ioc2, ctx2);
+        auto const results2 = resolver2.resolve(host, "443");
+        beast::get_lowest_layer(stream2).connect(results2);
+        if (!SSL_set_tlsext_host_name(stream2.native_handle(), host.c_str())) {
+            throw beast::system_error(
+                beast::error_code(static_cast<int>(::ERR_get_error()),
+                                    net::error::get_ssl_category()),
+                "Failed to set SNI hostname");
+        }
+        stream2.handshake(ssl::stream_base::client);
+
+        http::request<http::string_body> req2{http::verb::post, path, 11};
+        req2.set(http::field::host, host);
+        req2.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        req2.set(http::field::content_type, "application/json");
+        req2.body() = body;
+        req2.prepare_payload();
+
+        http::write(stream2, req2);
+        beast::flat_buffer buf2;
+        http::response<http::string_body> res2;
+        http::read(stream2, buf2, res2);
+        json j = json::parse(res2.body());
+        if (j.contains("data") && j["data"].contains("pair") &&
+            !j["data"]["pair"].is_null()) {
+            auto pair = j["data"]["pair"];
+            double r0 = std::stod(pair["reserve0"].get<std::string>());
+            double r1 = std::stod(pair["reserve1"].get<std::string>());
+            std::string sym0 = pair["token0"]["symbol"].get<std::string>();
+            std::string sym1 = pair["token1"]["symbol"].get<std::string>();
+            if (r0 == 0.0 || r1 == 0.0) return 0.0;
+            if (sym0 == "USDC" || sym0 == "USDT")
+                return r0 == 0.0 ? 0.0 : r1 / r0;
+            else
+                return r1 == 0.0 ? 0.0 : r0 / r1;
+        }
+    } catch (...) {
+        // ignore errors and return zero
+    }
+    return 0.0;
 }

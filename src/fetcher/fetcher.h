@@ -95,6 +95,9 @@ class UniswapFetcher: public Fetcher {
         static std::string getPoolAddress(Symbol sym);
         static int getToken0Decimals(Symbol sym);
         static int getToken1Decimals(Symbol sym);
+        // perform a GraphQL request to the appropriate subgraph; returns 0.0
+        // on failure.
+        double querySubgraph(Symbol sym);
 
         PriceStorage& storage_;
         Symbol symbol_;
